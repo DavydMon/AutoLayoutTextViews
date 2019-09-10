@@ -54,10 +54,17 @@
 - (void)commonInit
 {
   _placeholderColor = [UIColor lightGrayColor];
-  _placeholderInsets = UIEdgeInsetsMake(8.0f, 4.0f, 8.0f, 0.0f);
+  _placeholderInsets = UIEdgeInsetsMake(8.0f, 4.0f, 0.0f, 0.0f);
   self.font = self.font ?: [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
   
   [self startObservingNotifications];
+}
+
+#pragma mark - Custom Accessors
+
+- (Class)viewClass
+{
+  return [UIView class];
 }
 
 #pragma mark - Notifications
@@ -65,30 +72,29 @@
 - (void)startObservingNotifications
 {
   [[NSNotificationCenter defaultCenter] addObserver:self
-   
-                                           selector:@selector(textDidChange:)
-                                               name:UITextViewTextDidChangeNotification
-                                             object:self];
+                                selector:@selector(textDidChange:)
+                                    name:UITextViewTextDidChangeNotification
+                                  object:self];
   
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(textDidChange:)
-                                               name:UIApplicationDidChangeStatusBarOrientationNotification
-                                             object:nil];
+                                selector:@selector(textDidChange:)
+                                    name:UIApplicationDidChangeStatusBarOrientationNotification
+                                  object:nil];
   
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(keyboardWillShow:)
-                                               name:UIKeyboardWillShowNotification
-                                             object:nil];
+                                selector:@selector(keyboardWillShow:)
+                                    name:UIKeyboardWillShowNotification
+                                  object:nil];
   
   [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(keyboardWillHide:)
-                                               name:UIKeyboardWillHideNotification
-                                             object:nil];
+                                selector:@selector(keyboardWillHide:)
+                                    name:UIKeyboardWillHideNotification
+                                  object:nil];
 }
 
 - (void)textDidChange:(NSNotification *)notification
 {
-  [self requestRedraw];
+  [self setNeedsDisplay];
 }
 
 - (void)keyboardWillShow:(NSNotification *)notification
@@ -103,13 +109,6 @@
 
 #pragma mark - Custom Accessors
 
-
-- (void)setAttributedText:(NSAttributedString *)attributedText
-{
-  [super setAttributedText:attributedText];
-  [self setNeedsDisplay];
-}
-
 - (void)setPlaceholder:(NSString *)placeholder
 {
   if (_placeholder == placeholder) {
@@ -117,13 +116,7 @@
   }
   
   _placeholder = [placeholder copy];
-  [self requestRedraw];
-}
-
-- (void)setFont:(UIFont *)font
-{
-  [super setFont:font];
-  [self requestRedraw];
+  [self setNeedsDisplay];
 }
 
 - (void)setPlaceholderColor:(UIColor *)placeholderColor
@@ -135,85 +128,44 @@
   _placeholderColor = placeholderColor;
   
   if ([self shouldDrawPlaceholder]) {
-    [self requestRedraw];
+    [self setNeedsDisplay];
   }
 }
 
 - (void)setText:(NSString *)text
 {
   [super setText:text];
-  [self requestRedraw];
-}
-
-- (void)setTextAlignment:(NSTextAlignment)textAlignment
-{
-  [super setTextAlignment:textAlignment];
-  [self requestRedraw];
-}
-
-- (void)requestRedraw
-{
-  [self invalidateIntrinsicContentSize];
   [self setNeedsDisplay];
-  [self setNeedsLayout];
-  [self setNeedsUpdateConstraints];
-}
-
-#pragma mark - Size That Fits
-
-- (CGSize)intrinsicContentSize {
-  return [self sizeThatFits:self.bounds.size];
-}
-
-- (CGSize)sizeThatFits:(CGSize)size
-{  
-  if (![self shouldDrawPlaceholder]) {
-    CGSize sizeThatFits = [super sizeThatFits:size];
-    sizeThatFits.width = self.bounds.size.width;
-    return sizeThatFits;
-  }
-    
-  CGRect placeholderInsetRect = [self calculatePlaceholderRectInsetInRect:self.frame];
-  CGRect placeholderTextRect = [self.placeholder
-                                boundingRectWithSize:CGSizeMake(placeholderInsetRect.size.width, CGFLOAT_MAX)
-                                options:NSStringDrawingUsesLineFragmentOrigin
-                                attributes:[self placeholderAttributes]
-                                context:nil];
-  
-  return CGSizeMake(self.bounds.size.width,
-                    ceilf(placeholderTextRect.size.height) +
-                    self.placeholderInsets.top + self.placeholderInsets.bottom);
-}
-
-- (NSDictionary *)placeholderAttributes
-{
-  NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle defaultParagraphStyle] mutableCopy];
-  paragraphStyle.lineBreakMode = NSLineBreakByWordWrapping;
-  paragraphStyle.alignment = self.textAlignment;
-  
-  NSMutableDictionary *attributes = [[NSMutableDictionary alloc] init];
-  attributes[NSParagraphStyleAttributeName] = paragraphStyle;
-
-  if (self.font) {
-    attributes[NSFontAttributeName] = self.font;
-  }  
-  attributes[NSForegroundColorAttributeName] = self.placeholderColor;
-  
-  return attributes;
 }
 
 #pragma mark - Draw Rect
 
 - (void)drawRect:(CGRect)rect
 {
-  [super drawRect:rect];
-  
-  if (![self shouldDrawPlaceholder]) {
-    return;
-  }
-  
-  [self.placeholder drawInRect:[self calculatePlaceholderRectInsetInRect:rect]
-                withAttributes:[self placeholderAttributes]];
+    [super drawRect:rect];
+    
+    if (![self shouldDrawPlaceholder]) {
+        return;
+    }
+    
+    NSMutableParagraphStyle *paragraphStyle = [[NSMutableParagraphStyle defaultParagraphStyle] mutableCopy];
+    paragraphStyle.lineBreakMode = NSLineBreakByWordWrapping;
+    paragraphStyle.alignment = self.textAlignment;
+    
+    NSDictionary *attributes = @{NSFontAttributeName: self.font,
+                                 NSParagraphStyleAttributeName: paragraphStyle,
+                                 NSForegroundColorAttributeName: self.placeholderColor};
+    
+    CGFloat containerHeight = CGRectGetHeight(self.frame) / 2;
+    CGRect textHeight = [self.placeholder boundingRectWithSize:self.frame.size
+                                                       options:NSStringDrawingUsesLineFragmentOrigin
+                                                    attributes:@{NSFontAttributeName:self.font}
+                                                       context:nil];
+    CGFloat resultHeight = containerHeight - textHeight.size.height / 2;
+    
+    _placeholderInsets = UIEdgeInsetsMake(resultHeight, 4.0f, 0.0f, 0.0f);
+    
+    [self.placeholder drawInRect:[self calculatePlaceholderRectInsetInRect:rect] withAttributes:attributes];
 }
 
 - (BOOL)shouldDrawPlaceholder
@@ -223,15 +175,8 @@
 
 - (CGRect)calculatePlaceholderRectInsetInRect:(CGRect)rect
 {
-  CGRect placeholderRect = rect;
-  placeholderRect.origin.x += (self.placeholderInsets.left + self.contentInset.left);
-  placeholderRect.size.width -= placeholderRect.origin.x;
-  placeholderRect.size.width -= (self.placeholderInsets.right + self.contentInset.right);
-  
-  placeholderRect.origin.y += (self.placeholderInsets.top + self.contentInset.top);
-  placeholderRect.size.height -= placeholderRect.origin.y;
-  placeholderRect.size.height -= (self.placeholderInsets.bottom + self.contentInset.bottom);
-  
+  CGRect placeholderRect = CGRectInset(rect, _placeholderInsets.left, _placeholderInsets.top);
+  placeholderRect.origin.y += self.contentInset.top;
   return placeholderRect;
 }
 

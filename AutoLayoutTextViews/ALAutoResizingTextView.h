@@ -24,8 +24,6 @@
 
 #import "ALPlaceholderTextView.h"
 
-NS_ASSUME_NONNULL_BEGIN
-
 @class ALAutoResizingTextView;
 
 /**
@@ -66,7 +64,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  *	The object that acts as the delegate of the text view. The delegate should conform to `ALAutoResizingTextViewDelegate`, which conforms to `ALTextViewDelegate` and `UITextViewDelegate`.
  */
-@property (weak, nonatomic, nullable) id <ALAutoResizingTextViewDelegate> delegate;
+@property (weak, nonatomic) id <ALAutoResizingTextViewDelegate> delegate;
 
 /**
  *	The minimum height for the text view.
@@ -90,8 +88,7 @@ NS_ASSUME_NONNULL_BEGIN
  *  @discussion The default value is `0.2`.
  *  If you set this value to `0`, the height will be updated without animation.
  */
-@property (assign, nonatomic) IBInspectable NSTimeInterval autoresizingAnimationDuration
-__deprecated_msg("this is now entirely ignored");
+@property (assign, nonatomic) IBInspectable NSTimeInterval autoresizingAnimationDuration;
 
 /**
  *  The height constraint
@@ -99,7 +96,7 @@ __deprecated_msg("this is now entirely ignored");
  *  @discussion If this outlet isn't connected, it will try to be determined by iterating through its `self.constraints`.
  *  @warning If you do not explicitly set this outlet, and it's *not* able to be determined, this class will throw a runtime exception.
  */
-@property (weak, nonatomic, null_unspecified) IBOutlet NSLayoutConstraint *heightConstraint;
+@property (weak, nonatomic) IBOutlet NSLayoutConstraint *heightConstraint;
 
 /**
  *  The height the text view is changing *to*
@@ -112,5 +109,3 @@ __deprecated_msg("this is now entirely ignored");
 @property (assign, nonatomic) CGFloat oldHeight;
 
 @end
-
-NS_ASSUME_NONNULL_END

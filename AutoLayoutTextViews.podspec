@@ -1,8 +1,8 @@
 Pod::Spec.new do |s|
   s.platform     = :ios
-  s.ios.deployment_target = "9.0"
+  s.ios.deployment_target = "8.0"
   s.name         = "AutoLayoutTextViews"
-  s.version      = "1.3.0"
+  s.version      = "1.3.1"
   s.summary      = "AutoLayoutTextViews subclasses UITextView and adds placeholder text, auto resizing, and keyboard avoiding functionality."
   s.homepage     = "https://github.com/JRG-Developer/AutoLayoutTextViews"
   s.license      = { :type => "MIT", :file => "LICENSE" }

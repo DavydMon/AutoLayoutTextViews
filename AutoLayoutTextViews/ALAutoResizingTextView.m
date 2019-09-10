@@ -32,8 +32,10 @@
 - (void)commonInit
 {
   [super commonInit];
+  
   _minimumHeight = 0.0f;
   _maximumHeight = CGFLOAT_MAX;
+  _autoresizingAnimationDuration = 0.2f;
 }
 
 #pragma mark - View Setup
@@ -52,9 +54,6 @@
   for (NSLayoutConstraint *constraint in self.constraints) {
     if ([self isHeightConstraint:constraint]) {
       self.heightConstraint = constraint;
-      if (self.minimumHeight == 0) {
-        self.minimumHeight = constraint.constant;
-      }
       break;
     }
   }
@@ -67,37 +66,28 @@
 
 #pragma mark - Custom Accessors
 
-- (void)setBounds:(CGRect)newBounds
-{
-  [super setBounds:newBounds];
-  [self updateHeightConstraint];
-}
-
-- (void)setFrame:(CGRect)frame
-{
-  [super setFrame:frame];
-  [self updateHeightConstraint];
-}
-
 - (void)setMaximumHeight:(CGFloat)maximumHeight
 {
   _maximumHeight = maximumHeight > 0 ? maximumHeight : CGFLOAT_MAX;
-  [self updateHeightConstraint];
+  [self setNeedsDisplay];
 }
 
-- (void)setMinimumHeight:(CGFloat)minimumHeight
+-(void)setMinimumHeight:(CGFloat)minimumHeight
 {
-  _minimumHeight = fmaxf(0, minimumHeight);
-  [self updateHeightConstraint];
+  _minimumHeight = minimumHeight > 0 ? minimumHeight : 0;
+  [self setNeedsDisplay];
 }
 
 #pragma mark - View
 
 - (void)layoutSubviews
 {
-  [self invalidateIntrinsicContentSize];
-  [self setNeedsDisplay];
+  NSAssert(self.heightConstraint, @"ALAutoResizingTextView is missing a height constraint. ALAutoResizingTextView "
+           @"relies on auto layout and will not work if its `heightConstraint` is not set.");
+  
   [super layoutSubviews];
+  [self setNeedsUpdateConstraints];
+  [self updateConstraintsIfNeeded];
 }
 
 - (void)updateConstraints
@@ -108,51 +98,78 @@
 
 - (void)updateHeightConstraint
 {
-  CGFloat oldHeight = self.heightConstraint.constant;
-  CGFloat newHeight = [self calculateNewHeight];
+  self.oldHeight = self.heightConstraint.constant;
+  self.newHeight = [self calculateNewHeight];
   
-  if (oldHeight == newHeight) { return; }
-  
-  self.oldHeight = oldHeight;
-  self.newHeight = newHeight;
-  
-  if (self.newHeight >= self.maximumHeight) {
-    [self setScrollEnabled:YES];
-    
-  } else {
-    [self setScrollEnabled:NO];
+  if (![self didHeightChange]) {
+    return;
   }
   
-  [self performHeightWillUpdate];
-  [self performHeightDidUpdate];
+  if ([self shouldAnimateHeightChange]) {
+    [self animateHeightChange];
+    
+  } else {
+    [self setNewHeightWithoutAnimation];
+  }
 }
 
 - (CGFloat)calculateNewHeight
 {
-  CGFloat height = [self sizeThatFits:self.frame.size].height;
-  
-  if (height > self.maximumHeight) {
-    height = self.maximumHeight;
+  CGFloat height = [self heightThatFitsContents];
+  height = fminf(height, self.maximumHeight);
+  height = fmaxf(height, self.minimumHeight);
+  return ceilf(height);
+}
+
+- (CGFloat)heightThatFitsContents
+{
+  CGSize size = [self contentSize];
+  return size.height + self.contentInset.top;
+}
+
+- (BOOL)didHeightChange
+{
+  return self.newHeight != self.oldHeight;
+}
+
+- (BOOL)shouldAnimateHeightChange
+{
+  return self.autoresizingAnimationDuration > 0 && ![self shouldDrawPlaceholder];
+}
+
+- (void)animateHeightChange
+{
+  [UIView animateWithDuration:self.autoresizingAnimationDuration
+                        delay:0.0f
+                      options:UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionBeginFromCurrentState
+                   animations:[self animationBlock]
+                   completion:[self completionBlock]];
+}
+
+- (void)setNewHeightWithoutAnimation
+{
+  [self animationBlock]();
+  [self completionBlock](YES);
+}
+
+- (void (^)())animationBlock
+{
+  return  ^{
+    if ([self.delegate respondsToSelector:@selector(textView:willChangeFromHeight:toHeight:)]) {
+      [self.delegate textView:self willChangeFromHeight:self.oldHeight toHeight:self.newHeight];
+    }
+    self.heightConstraint.constant = self.newHeight;
+  };
+}
+
+- (void(^)(BOOL))completionBlock
+{
+  return ^(BOOL finished) {
     
-  } else if (height < self.minimumHeight) {
-    height = self.minimumHeight;
-  }
-  return height;
-}
-
-- (void)performHeightWillUpdate
-{
-  if (self.delegate && [self.delegate respondsToSelector:@selector(textView:willChangeFromHeight:toHeight:)]) {
-    [self.delegate textView:self willChangeFromHeight:self.oldHeight toHeight:self.newHeight];
-  }
-  self.heightConstraint.constant = self.newHeight;
-}
-
-- (void)performHeightDidUpdate
-{
-  if (self.delegate && [self.delegate respondsToSelector:@selector(textView:didChangeFromHeight:toHeight:)]) {
-    [self.delegate textView:self didChangeFromHeight:self.oldHeight toHeight:self.newHeight];
-  }
+    if ([self.delegate respondsToSelector:@selector(textView:didChangeFromHeight:toHeight:)]) {
+      [self.delegate textView:self didChangeFromHeight:self.oldHeight toHeight:self.newHeight];
+    }
+  };
 }
 
 @end
